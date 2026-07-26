@@ -21,6 +21,31 @@
   "activationEvents": [
     "onStartupFinished"
   ],
+  "contributes": {
+    "configuration": {
+      "title": "Explorer Worktree Picker",
+      "properties": {
+        "explorerWorktreePicker.worktreeColor": {
+          "type": "string",
+          "default": "",
+          "scope": "window",
+          "markdownDescription": "Foreground color used for linked worktrees and their refresh action. Enter a VS Code CSS color such as `#D18AA1`, or leave empty to use the theme-aware muted rose default."
+        }
+      }
+    },
+    "colors": [
+      {
+        "id": "explorerWorktreePicker.worktreeForeground",
+        "description": "Foreground color for the active linked worktree status item.",
+        "defaults": {
+          "dark": "#D18AA1",
+          "light": "#A54563",
+          "highContrast": "#FFB3CA",
+          "highContrastLight": "#8A2445"
+        }
+      }
+    ]
+  },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src --ext .ts --max-warnings=0",

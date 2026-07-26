@@ -6,6 +6,9 @@
 - Bottom-left status bar shows:
   - Worktree picker control: `$(multiple-windows) <current label>`
   - Refresh control: `$(refresh)`
+- The controls use adjacent priorities and the same display name.
+- Linked worktrees use the `explorerWorktreePicker.worktreeForeground` theme color.
+- `explorerWorktreePicker.worktreeColor` can override that color and updates the controls live.
 - Clicking the picker opens a quick pick containing:
   - `Main`
   - Up to 5 linked worktrees
@@ -41,6 +44,9 @@
 - No invocation of `openFolder` and no `openInNewWindow` behavior.
 - After successful update:
   - wait for `onDidChangeWorkspaceFolders`
+  - explicitly label the replacement folder with its picker label
+  - open/refresh the target in VS Code's built-in Git integration
+  - close the previous Git repository registration
   - focus Explorer
   - collapse explorer folders
 

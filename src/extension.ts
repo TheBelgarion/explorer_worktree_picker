@@ -8,6 +8,7 @@ import {
   ThemeColor,
   Uri,
   commands,
+  extensions,
   window,
   workspace
 } from 'vscode';
@@ -16,6 +17,7 @@ import {
   WorktreeDescriptor,
   buildMenuEntries,
   getDisplayLabel,
+  getWorkspaceFolderName,
   normalizePathForCompare,
   parsePorcelainWorktreeList
 } from './model/worktree';
@@ -25,6 +27,9 @@ const CMD_REFRESH = 'explorerWorktreePicker.refresh';
 const RECENT_KEY = 'explorerWorktreePicker.recentWorktrees';
 const MAX_RECENT_ENTRIES = 5;
 const WORKTREE_ICON = '$(multiple-windows)';
+const WORKTREE_FOREGROUND = new ThemeColor('explorerWorktreePicker.worktreeForeground');
+const CONFIG_NAMESPACE = 'explorerWorktreePicker';
+const CONFIG_WORKTREE_COLOR = 'worktreeColor';
 
 const execFileAsync = util.promisify(execFile);
 
@@ -37,6 +42,22 @@ interface SingleWorkspaceFolder {
   name: string;
 }
 
+interface GitRepository {
+  readonly rootUri: Uri;
+  status(): Promise<void>;
+}
+
+interface GitApi {
+  readonly repositories: GitRepository[];
+  getRepository(uri: Uri): GitRepository | null;
+  openRepository(root: Uri): Promise<GitRepository | null>;
+}
+
+interface GitExtension {
+  readonly enabled: boolean;
+  getAPI(version: 1): GitApi;
+}
+
 export function activate(context: ExtensionContext): void {
   const state = new WorktreePickerState(context);
   context.subscriptions.push(state);
@@ -47,8 +68,16 @@ export function deactivate(): void {
 }
 
 class WorktreePickerState implements Disposable {
-  private pickerStatus = window.createStatusBarItem(StatusBarAlignment.Left, 100);
-  private refreshStatus = window.createStatusBarItem(StatusBarAlignment.Left, 99);
+  private pickerStatus = window.createStatusBarItem(
+    'explorerWorktreePicker.current',
+    StatusBarAlignment.Left,
+    100
+  );
+  private refreshStatus = window.createStatusBarItem(
+    'explorerWorktreePicker.refresh',
+    StatusBarAlignment.Left,
+    99
+  );
   private activeWorktreePath: string | undefined;
   private entries: OrderedWorktreeResult | undefined;
   private busy = false;
@@ -57,11 +86,11 @@ class WorktreePickerState implements Disposable {
   private readonly workspaceNamesByPath = new Map<string, string>();
 
   constructor(private readonly context: ExtensionContext) {
-    this.pickerStatus.name = 'Worktree Picker';
+    this.pickerStatus.name = 'Explorer Worktree Picker';
     this.pickerStatus.command = CMD_OPEN_PICKER;
     this.pickerStatus.tooltip = 'pick worktree';
 
-    this.refreshStatus.name = 'Refresh Worktree Picker';
+    this.refreshStatus.name = 'Explorer Worktree Picker';
     this.refreshStatus.command = CMD_REFRESH;
     this.refreshStatus.text = '$(refresh)';
     this.refreshStatus.tooltip = 'Refresh worktree list';
@@ -73,6 +102,11 @@ class WorktreePickerState implements Disposable {
       this.refreshStatus,
       workspace.onDidChangeWorkspaceFolders(() => {
         void this.refreshWorktrees();
+      }),
+      workspace.onDidChangeConfiguration((event) => {
+        if (event.affectsConfiguration(`${CONFIG_NAMESPACE}.${CONFIG_WORKTREE_COLOR}`)) {
+          this.renderStatusBar();
+        }
       }),
       commands.registerCommand(CMD_OPEN_PICKER, () => {
         void this.openPicker();
@@ -253,13 +287,12 @@ class WorktreePickerState implements Disposable {
       return;
     }
 
+    let switched = false;
     await this.withBusy('Switching worktree', async () => {
       const currentFolderUri = currentFolder.uri;
       const targetUri = this.makeCompatibleUri(currentFolderUri, targetPath);
       const targetName = this.getWorkspaceName(targetPath);
-      const replaceOptions = targetName
-        ? { uri: targetUri, name: targetName }
-        : { uri: targetUri };
+      const replaceOptions = { uri: targetUri, name: targetName };
 
       const ok = workspace.updateWorkspaceFolders(0, 1, replaceOptions);
       if (!ok) {
@@ -275,15 +308,23 @@ class WorktreePickerState implements Disposable {
         // best-effort focus/collapse in cases where command is unavailable.
       }
 
-      const switched = this.normalize(this.uriToPath(workspace.workspaceFolders?.[0]?.uri ?? folderUriPlaceholder()));
-      if (switched !== this.normalize(targetPath)) {
+      const confirmedPath = this.normalize(
+        this.uriToPath(workspace.workspaceFolders?.[0]?.uri ?? folderUriPlaceholder())
+      );
+      if (confirmedPath !== this.normalize(targetPath)) {
         window.showErrorMessage(`Could not switch explorer to ${targetPath}`);
         return;
       }
 
+      await this.realignGitRepository(currentFolderUri, targetPath);
       await this.recordRecentSelection(targetPath);
-      await this.refreshWorktrees();
+      this.activeWorktreePath = targetPath;
+      switched = true;
     });
+
+    if (switched) {
+      await this.refreshWorktrees();
+    }
   }
 
   private async recordRecentSelection(targetPath: string): Promise<void> {
@@ -384,6 +425,44 @@ class WorktreePickerState implements Disposable {
     return String(result.stdout).trimEnd();
   }
 
+  private async realignGitRepository(previousFolderUri: Uri, targetPath: string): Promise<void> {
+    try {
+      const gitExtension = extensions.getExtension<GitExtension>('vscode.git');
+      if (!gitExtension) {
+        return;
+      }
+
+      const exported = gitExtension.isActive
+        ? gitExtension.exports
+        : await gitExtension.activate();
+      if (!exported.enabled) {
+        return;
+      }
+
+      const api = exported.getAPI(1);
+      const targetUri = Uri.file(targetPath);
+      const discoveredTarget = api.getRepository(targetUri);
+      const targetRepository = discoveredTarget
+        && this.normalize(this.uriToPath(discoveredTarget.rootUri)) === this.normalize(targetPath)
+        ? discoveredTarget
+        : await api.openRepository(targetUri);
+      await targetRepository?.status();
+
+      const previousPath = this.uriToPath(previousFolderUri);
+      const previousRepository = api.repositories.find(
+        (repository) => this.normalize(this.uriToPath(repository.rootUri)) === this.normalize(previousPath)
+      );
+      if (
+        previousRepository
+        && this.normalize(this.uriToPath(previousRepository.rootUri)) !== this.normalize(targetPath)
+      ) {
+        await commands.executeCommand('git.close', previousRepository.rootUri);
+      }
+    } catch {
+      // Git integration is optional; Explorer switching remains valid without it.
+    }
+  }
+
   private hideControls(): void {
     this.pickerStatus.hide();
     this.refreshStatus.hide();
@@ -399,7 +478,8 @@ class WorktreePickerState implements Disposable {
     const isCurrentMain = this.normalize(this.entries.main.path) === this.normalize(this.activeWorktreePath);
     const display = isCurrentMain ? 'Main' : entry ? getDisplayLabel(entry).label : 'Main';
     this.pickerStatus.text = `${WORKTREE_ICON} ${display}`;
-    this.pickerStatus.color = isCurrentMain ? undefined : new ThemeColor('statusBarItem.warningForeground');
+    this.pickerStatus.color = isCurrentMain ? undefined : this.getWorktreeForeground();
+    this.refreshStatus.color = this.pickerStatus.color;
     this.refreshStatus.text = '$(refresh)';
 
     this.pickerStatus.show();
@@ -446,8 +526,24 @@ class WorktreePickerState implements Disposable {
     }
   }
 
-  private getWorkspaceName(path: string): string | undefined {
-    return this.workspaceNamesByPath.get(this.normalize(path));
+  private getWorkspaceName(path: string): string {
+    const normalized = this.normalize(path);
+    const entry = this.resolveEntryByPath(path);
+    if (entry && this.entries) {
+      const isMain = normalized === this.normalize(this.entries.main.path);
+      return getWorkspaceFolderName(entry, isMain);
+    }
+
+    return this.workspaceNamesByPath.get(normalized) ?? 'Worktree';
+  }
+
+  private getWorktreeForeground(): string | ThemeColor {
+    const configured = workspace
+      .getConfiguration(CONFIG_NAMESPACE)
+      .get<string>(CONFIG_WORKTREE_COLOR, '')
+      .trim();
+
+    return configured || WORKTREE_FOREGROUND;
   }
 }
 

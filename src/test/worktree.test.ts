@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildMenuEntries,
   getDisplayLabel,
+  getWorkspaceFolderName,
   parsePorcelainWorktreeList
 } from '../model/worktree';
 
@@ -194,5 +195,19 @@ detached
     const label = getDisplayLabel(detached[0]);
     expect(label.kind).toBe('detached');
     expect(label.label).toBe('Detached deadbee');
+  });
+
+  it('uses stable workspace folder names for main and linked worktrees', () => {
+    const list = parsePorcelainWorktreeList(`worktree /repo/main
+HEAD 1111111
+branch refs/heads/main
+
+worktree /repo/worktrees/feature
+HEAD 2222222
+branch refs/heads/codex/feature
+`);
+
+    expect(getWorkspaceFolderName(list[0], true)).toBe('Main');
+    expect(getWorkspaceFolderName(list[1], false)).toBe('codex/feature');
   });
 });

@@ -1,6 +1,6 @@
 # Explorer Worktree Picker
 
-Tiny VS Code extension that puts a two-item picker in the bottom-left status bar:
+Tiny VS Code extension that puts two adjacent actions in the bottom-left status bar:
 
 1. Current worktree label with a `$(multiple-windows)` icon.
 2. `$(refresh)` action to refresh the list.
@@ -11,6 +11,18 @@ Clicking the first item opens a picker with:
 - Up to 5 linked worktrees, ordered by most recently selected first.
 
 Switching updates the current Explorer root in the **same VS Code window** using `updateWorkspaceFolders`.
+The target folder receives the same explicit label shown by the picker, and VS Code's built-in Git
+integration is realigned to that target after the switch.
+
+Linked worktrees use a muted rose foreground so they remain distinct from `Main` without using a
+warning-level background.
+
+## Settings
+
+All extension settings use the unique `explorerWorktreePicker.*` namespace:
+
+- `explorerWorktreePicker.worktreeColor`: linked-worktree and refresh foreground color. Leave empty
+  for the theme-aware muted rose default, or enter a VS Code CSS color such as `#D18AA1`.
 
 ## Install
 

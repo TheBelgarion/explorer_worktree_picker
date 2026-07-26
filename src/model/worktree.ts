@@ -50,6 +50,10 @@ export function getDisplayLabel(worktree: WorktreeDescriptor): { label: string; 
   };
 }
 
+export function getWorkspaceFolderName(worktree: WorktreeDescriptor, isMain: boolean): string {
+  return isMain ? 'Main' : getDisplayLabel(worktree).label;
+}
+
 export function normalizeBranch(ref: string): string {
   const trimmed = ref.trim();
   if (trimmed.startsWith(GIT_REF_PREFIX)) {

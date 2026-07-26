@@ -60,7 +60,7 @@ tag-release:
 		echo "VERSION is required. Example: make tag-release VERSION=0.1.1"; \
 		exit 1; \
 	fi
-	@if ! echo "$(VERSION)" | grep -Eq '^[0-9]+\\.[0-9]+\\.[0-9]+$$'; then \
+	@if ! echo "$(VERSION)" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$$'; then \
 		echo "VERSION must be semver x.y.z"; \
 		exit 1; \
 	fi

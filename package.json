@@ -1,0 +1,48 @@
+{
+  "name": "explorer-worktree-picker",
+  "displayName": "Explorer Worktree Picker",
+  "description": "Bottom-left status bar picker for quickly switching explorer worktree root between Main and recent worktrees.",
+  "version": "0.1.0",
+  "publisher": "thebelgarion",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.118.0",
+    "node": ">=22.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TheBelgarion/explorer_worktree_picker"
+  },
+  "categories": [
+    "Other"
+  ],
+  "private": true,
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src --ext .ts --max-warnings=0",
+    "test": "vitest run",
+    "compile": "node ./scripts/build.mjs",
+    "build": "npm run compile",
+    "package": "npm run build && npx --yes @vscode/vsce@3.9.2 package --allow-missing-repository"
+  },
+  "devDependencies": {
+    "@types/node": "^22.8.0",
+    "@types/vscode": "^1.118.0",
+    "@typescript-eslint/eslint-plugin": "^8.18.0",
+    "@typescript-eslint/parser": "^8.18.0",
+    "eslint": "^9.17.0",
+    "esbuild": "^0.28.1",
+    "typescript": "^5.6.3",
+    "vitest": "^3.2.7"
+  },
+  "overrides": {
+    "esbuild": "^0.28.1"
+  },
+  "allowScripts": {
+    "esbuild@0.28.1": true
+  }
+}

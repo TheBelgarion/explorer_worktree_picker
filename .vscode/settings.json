@@ -1,0 +1,3 @@
+{
+    "window.title": "${dirty}${activeEditorShort}${separator}explorer_worktree_picker${separator}${profileName}${separator}${appName}"
+}

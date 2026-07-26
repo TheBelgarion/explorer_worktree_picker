@@ -2,7 +2,7 @@
   "name": "explorer-worktree-picker",
   "displayName": "Explorer Worktree Picker",
   "description": "Bottom-left status bar picker for quickly switching explorer worktree root between Main and recent worktrees.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "thebelgarion",
   "license": "MIT",
   "engines": {
